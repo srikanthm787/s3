@@ -3,6 +3,8 @@ import boto3
 import logging
 import os
 from botocore.config import Config
+import json
+from botocore import UNSIGNED
 
 # ---------- CONFIGURATION ----------
 S3_ENDPOINT = "https://object.us1.example.com"
@@ -129,6 +131,68 @@ def test_T006_versioning():
     for ver in versions.get("Versions", []):
         log.info(f" VersionId: {ver['VersionId']}, Key: {ver['Key']}, IsLatest: {ver['IsLatest']}")
 
+def test_T010_key_based_auth():
+    log.info("T010 - Key-based Auth")
+    try:
+        s3.list_buckets()
+        log.info("Access successful with provided credentials.")
+    except Exception as e:
+        log.error(f"Authentication failed: {e}")
+
+def test_T011_bucket_policy():
+    log.info("T011 - Bucket Policy")
+    policy = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Sid": "DenyAll",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [
+                f"arn:aws:s3:::{BUCKET}",
+                f"arn:aws:s3:::{BUCKET}/*"
+            ]
+        }]
+    }
+    try:
+        s3.put_bucket_policy(Bucket=BUCKET, Policy=json.dumps(policy))
+        log.info("Bucket policy applied")
+        s3.list_objects_v2(Bucket=BUCKET)
+        log.error("Access not restricted as expected")
+    except Exception as e:
+        log.info(f"Access denied as expected: {e}")
+
+def test_T012_anonymous_access():
+    log.info("T012 - Anonymous Access")
+    anon_s3 = boto3.client('s3', endpoint_url=S3_ENDPOINT, config=Config(signature_version=UNSIGNED), verify=VERIFY_SSL)
+    try:
+        anon_s3.list_objects_v2(Bucket=BUCKET)
+        log.error("Anonymous access allowed")
+    except Exception as e:
+        log.info(f"Anonymous access denied: {e}")
+
+def test_T013_ip_restriction():
+    log.info("T013 - IP Restriction")
+    my_ip = "203.0.113.1"  # Replace with your IP
+    policy = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Sid": "IPDeny",
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "s3:*",
+            "Resource": [f"arn:aws:s3:::{BUCKET}", f"arn:aws:s3:::{BUCKET}/*"],
+            "Condition": {
+                "NotIpAddress": {"aws:SourceIp": my_ip}
+            }
+        }]
+    }
+    try:
+        s3.put_bucket_policy(Bucket=BUCKET, Policy=json.dumps(policy))
+        log.info(f"Bucket policy with IP restriction applied (only allows IP {my_ip})")
+    except Exception as e:
+        log.error(f"Failed to apply IP restriction policy: {e}")
+
 
 # ---------- LOGGING SETUP ----------
 logging.basicConfig(
@@ -148,3 +212,8 @@ if __name__ == "__main__":
     test_T004_object_delete()
     test_T005_multipart_upload()
     test_T006_versioning()
+    test_T010_key_based_auth()
+    test_T011_bucket_policy()
+    test_T012_anonymous_access()
+    test_T013_ip_restriction()
+
