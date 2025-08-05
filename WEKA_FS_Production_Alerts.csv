@@ -1,0 +1,51 @@
+Category,Alert Description,Severity
+Core Storage,Cluster degraded state,Critical
+Core Storage,Metadata node failure / unreachable,Critical
+Core Storage,Metadata node out of sync,Warning
+Core Storage,Metadata journal usage > 80%,Warning
+Core Storage,Cluster partition detected,Critical
+Core Storage,Cluster rebuild in progress or stuck,Warning
+Core Storage,File system capacity > 80% / 90% / 95%,Warning/Critical
+Core Storage,Flash tier full or nearing capacity,Critical
+Core Storage,Object tier unresponsive or full,Critical
+Core Storage,Quota breach on tenants or users,Warning
+Core Storage,High metadata latency (> X ms),Warning
+Core Storage,High I/O latency on reads/writes (> X ms),Warning
+Core Storage,Flash or SSD write amplification > threshold,Warning
+Core Storage,Background rebuild or tiering impacting performance,Warning
+Infrastructure,Node down/unreachable,Critical
+Infrastructure,High interconnect latency,Warning
+Infrastructure,Network interface errors/drops,Warning
+Infrastructure,Node CPU usage > 90%,Warning
+Infrastructure,Node memory usage > 90%,Warning
+Infrastructure,Disk/SSD failure or predictive failure,Critical
+Infrastructure,RAID group degraded,Critical
+Infrastructure,Controller/PSU/fan failure,Critical
+Client,Client mount failure,Critical
+Client,Client disconnects from cluster,Warning
+Client,Authentication errors,Warning
+Client,High client-side I/O latency,Warning
+Client,Queue depth per client > X,Warning
+Client,Client pushing small files at high rates,Warning
+Data Protection,Snapshot creation failure,Critical
+Data Protection,Snapshot space usage > threshold,Warning
+Data Protection,Checksum mismatch,Critical
+Data Protection,Data tiering failure,Warning
+Data Protection,Cloud/Object tier sync failure,Critical
+Multi-Tenancy,Tenant quota breached,Warning
+Multi-Tenancy,Namespace misconfiguration,Warning
+Multi-Tenancy,Excessive number of files/directories,Warning
+Service,Management API/API Gateway down,Critical
+Service,CLI/GUI access failure,Warning
+Service,Token or authentication failure,Warning
+Service,Certificate expiry warnings,Warning
+Backup/DR,Snapshot export to object storage failure,Critical
+Backup/DR,Object-store unreachable,Critical
+Backup/DR,Failure in scheduled backup or replication jobs,Critical
+Anomalies,No I/O activity for > N minutes,Info
+Anomalies,Sudden drop in throughput > 50% over 5 mins,Warning
+Anomalies,Burst of metadata ops > normal baseline,Warning
+Anomalies,File create/delete storm,Warning
+Custom,Specific tenant or user generating > X MB/s or IOPS,Info
+Custom,File system latency SLA breach,Warning
+Custom,Client metric reporting stopped,Warning
