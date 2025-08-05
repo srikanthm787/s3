@@ -139,28 +139,59 @@ def test_T010_key_based_auth():
     except Exception as e:
         log.error(f"Authentication failed: {e}")
 
-def test_T011_bucket_policy():
-    log.info("T011 - Bucket Policy")
-    policy = {
-        "Version": "2012-10-17",
-        "Statement": [{
-            "Sid": "DenyAll",
-            "Effect": "Deny",
-            "Principal": "*",
-            "Action": "s3:*",
-            "Resource": [
-                f"arn:aws:s3:::{BUCKET}",
-                f"arn:aws:s3:::{BUCKET}/*"
-            ]
-        }]
-    }
+def test_T011_deny_specific_prefix_with_restore():
+    log.info("T011 - Deny uploads to 'restricted/' prefix (with rollback)")
+
+    # Save current policy (if any)
     try:
-        s3.put_bucket_policy(Bucket=BUCKET, Policy=json.dumps(policy))
-        log.info("Bucket policy applied")
-        s3.list_objects_v2(Bucket=BUCKET)
-        log.error("Access not restricted as expected")
-    except Exception as e:
-        log.info(f"Access denied as expected: {e}")
+        existing_policy = s3.get_bucket_policy(Bucket=BUCKET)
+        original_policy = existing_policy["Policy"]
+        log.info("Saved original bucket policy")
+    except s3.exceptions.from_code("NoSuchBucketPolicy"):
+        original_policy = None
+        log.info("No existing bucket policy found")
+
+    # Temporary deny policy
+    test_policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "DenyPutToRestrictedPrefix",
+                "Effect": "Deny",
+                "Principal": "*",
+                "Action": "s3:PutObject",
+                "Resource": f"arn:aws:s3:::{BUCKET}/restricted/*"
+            }
+        ]
+    }
+
+    try:
+        # Apply test policy
+        s3.put_bucket_policy(Bucket=BUCKET, Policy=json.dumps(test_policy))
+        log.info("Policy applied: deny uploads to restricted/*")
+
+        # Upload to allowed/
+        try:
+            s3.put_object(Bucket=BUCKET, Key="allowed/test.txt", Body=b"test")
+            log.info("Upload to allowed/ succeeded")
+        except Exception as e:
+            log.error(f"Upload to allowed/ failed unexpectedly: {e}")
+
+        # Upload to restricted/
+        try:
+            s3.put_object(Bucket=BUCKET, Key="restricted/test.txt", Body=b"test")
+            log.error("Upload to restricted/ succeeded unexpectedly")
+        except Exception as e:
+            log.info(f"Upload to restricted/ blocked as expected: {e}")
+
+    finally:
+        # Restore original policy
+        if original_policy:
+            s3.put_bucket_policy(Bucket=BUCKET, Policy=original_policy)
+            log.info("Restored original bucket policy")
+        else:
+            s3.delete_bucket_policy(Bucket=BUCKET)
+            log.info("Removed test bucket policy")
 
 def test_T012_anonymous_access():
     log.info("T012 - Anonymous Access")
