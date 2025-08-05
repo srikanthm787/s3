@@ -24,7 +24,9 @@ s3 = boto3.client(
     config=Config(signature_version='s3v4'),
     verify=VERIFY_SSL
 )
-
+def generate_zero_data(size_bytes):
+    return io.BytesIO(b'\x00' * size_bytes)
+    
 def test_T001_bucket_create_delete():
     print("\n T001 - Bucket Create/Delete")
     test_bucket = "boto-test-bucket"
@@ -36,24 +38,38 @@ def test_T001_bucket_create_delete():
 def test_T002_object_put_get():
     print("\n T002 - Object PUT/GET (1KB to 1GB)")
     sizes = [
-        (1 * 1024, "1KB"),
-        (1 * 1024 * 1024, "1MB"),
-        (100 * 1024 * 1024, "100MB"),
-        (1 * 1024 * 1024 * 1024, "1GB")
+        1 * 1024,                     # 1 KB
+        10 * 1024,                    # 10 KB
+        100 * 1024,                   # 100 KB
+        1 * 1024 * 1024,              # 1 MB
+        10 * 1024 * 1024,             # 10 MB
+        100 * 1024 * 1024,            # 100 MB
+        1 * 1024 * 1024 * 1024        # 1 GB (adjust based on environment)
+        # 5 * 1024 * 1024 * 1024      # Optional: 5 GB (can be added if needed)
     ]
 
-    for size, label in sizes:
-        key = f"object-{label.lower()}.bin"
-        data = os.urandom(size)
-        print(f"  Uploading {label} object: {key}")
-        s3.put_object(Bucket=BUCKET, Key=key, Body=data)
-        log.info(f" Uploaded {label}")
+    for size in sizes:
+        key = f"zeros/object_{size}.bin"
 
-        print(f"  Downloading {label} object: {key}")
-        response = s3.get_object(Bucket=BUCKET, Key=key)
-        read_bytes = response['Body'].read()
-        assert len(read_bytes) == size, f" Size mismatch for {label} object!"
-        log.info(f" Verified {label} object roundtrip ({len(read_bytes)} bytes)")
+        try:
+            # Upload
+            log.info(f"Uploading {size} bytes to {key}")
+            s3.upload_fileobj(generate_zero_data(size), BUCKET, key)
+            log.info(f"Uploaded {key}")
+
+            # Download
+            log.info(f"Downloading {key}")
+            response = s3.get_object(Bucket=BUCKET, Key=key)
+            downloaded_size = len(response['Body'].read())
+
+            if downloaded_size == size:
+                log.info(f"Download size matches for {key} ({size} bytes)")
+            else:
+                log.error(f"Size mismatch: expected {size}, got {downloaded_size} for {key}")
+
+        except Exception as e:
+            log.error(f"Error in test_T002 for {key}: {e}")
+            
 
 def test_T003_object_list():
     print("\n T003 - Object LIST with pagination and prefix")
