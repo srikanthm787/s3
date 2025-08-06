@@ -1,0 +1,77 @@
+Great question — and this gets to the core of how bandwidth (GB/s) requirements translate into capacity (TB per GPU) recommendations.
+
+Let’s walk through the logic step by step.
+
+🧮 Step 1: What Does 125 GB/s per SU Mean?
+A Scalable Unit (SU) = 32 DGX nodes = 256 GPUs
+
+NVIDIA’s baseline recommendation is 125 GB/s read throughput per SU
+
+That means each GPU, on average, consumes:
+
+125
+ GB/s
+256
+ GPUs
+≈
+0.49
+ GB/s per GPU
+256 GPUs
+125 GB/s
+​
+ ≈0.49 GB/s per GPU
+So, ~500 MB/s sustained per GPU.
+
+This is bandwidth — now let’s translate that into capacity.
+
+🧮 Step 2: Sustained Read Throughput × Duration = Data Served
+To size how much flash storage is needed, we ask:
+
+"How much data must the system serve at that rate before it starts reusing old data, flushing, or reading from object tier?"
+
+Let’s assume:
+
+A model training job runs for 1 hour (3600 seconds)
+
+GPU keeps reading at 0.5 GB/s (based on NVIDIA’s 125 GB/s SU spec)
+
+Then per GPU data consumption over 1 hour is:
+
+0.5
+ GB/s
+×
+3600
+ s
+=
+1.8
+ TB
+0.5 GB/s×3600 s=1.8 TB
+But not all of this needs to be served from flash:
+
+Some data may be cached or reused
+
+Some datasets may be streamed once and discarded
+
+Some jobs checkpoint and resume, not starting from scratch
+
+So we apply a working set multiplier:
+
+Assume 50–75% of data is unique / not cached
+
+That gives you a realistic flash requirement of ~1–1.5 TB per GPU
+
+✅ Final Translation
+Parameter	Value
+Sustained bandwidth per GPU	~0.5 GB/s
+Training window	1–2 hours
+Data read per GPU	1.8–3.6 TB
+Flash storage required	1–1.5 TB per GPU (active working set)
+
+So the 1–1.5 TB per GPU flash recommendation is about holding enough active dataset and checkpoint data to:
+
+Avoid repeated remote/object access
+
+Sustain high read throughput during training
+
+Provide buffer space for multiple workloads
+
