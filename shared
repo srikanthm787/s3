@@ -1,0 +1,70 @@
+Short answer: because Kubernetes (and most CSI drivers) aren’t designed to coordinate the same underlying volume across independent control planes. You lose safety guarantees and make failures messy.
+
+Here’s what actually goes wrong:
+
+Cluster-scoped control = no coordination
+
+PV/PVC objects, bind/attach/detach, and scheduling are per cluster. Two clusters can simultaneously believe they “own” the same volume. There’s no cross-cluster fencing, leasing, or single-writer enforcement.
+
+AccessModes don’t extend across clusters
+
+RWO/ROX/RWX are enforced by a single scheduler. Across clusters, neither scheduler sees the other, so RWO can become multi-writer by accident, and RWX has no shared backpressure/QoS.
+
+CSI controller assumptions break
+
+external-provisioner/attacher run per cluster and don’t talk to each other. Multi-attach checks, NodeID tracking, and detach timeouts aren’t coordinated, leading to split-brain or concurrent writers (data corruption risk—especially for block volumes).
+
+Fencing & failure scenarios get dangerous
+
+If Cluster A loses network and Cluster B mounts the same volume, both can write. When A returns, you’ve got corruption. K8s fencing relies on its own node/controller state, not another cluster’s.
+
+Lifecycle coupling can delete your data
+
+If one cluster’s PVC has reclaimPolicy: Delete, a developer deleting it can destroy the backend volume while the other cluster is still using it. Finalizers/owner refs don’t protect the “other” cluster.
+
+Security & identity don’t line up
+
+You end up reusing storage credentials across clusters, breaking least-privilege. Mismatched fsGroup/UIDs/SELinux contexts cause permission surprises; audit trails are fragmented.
+
+Topology & performance drift
+
+Each cluster enforces its own zone/region topology. One may mount cross-zone (latency, cost), the other local—nondeterministic performance and noisy-neighbor effects with no shared throttling.
+
+Snapshots/backup consistency isn’t guaranteed
+
+One cluster can snapshot while the other is actively mutating—no application-consistent quiesce across clusters.
+
+Supportability
+
+Most vendors explicitly do not support the same LUN/filesystem concurrently mounted by different Kubernetes clusters unless the storage system provides its own distributed lock/consistency model and you follow their playbook.
+
+When can it be okay (with care)?
+
+Read-only datasets exported from an external system (e.g., NFS/HTTP/object store) to multiple clusters.
+
+True distributed/clustered filesystems that are designed for many clients (e.g., NFSv4.1, CephFS, Lustre, WEKA, VAST, DDN, etc.) but you still shouldn’t “share a PVC”; instead, provision independent PVCs in each cluster that point to the same external export/share, and rely on the storage system’s own concurrency controls. Keep writes controlled, ideally RO for fan-out use cases.
+
+Better patterns instead of “one PVC across clusters”:
+
+Active/Passive DR: two volumes + storage-native replication; promote on failover (clear RPO/RTO).
+
+Data distribution: publish data via object storage or a shared file service; mount read-only everywhere that consumes it.
+
+True multi-writer services: use databases/message buses built for cross-cluster concurrency.
+
+Migration: use CSI snapshots/backup tools (e.g., Velero) or storage replication to copy data between clusters rather than co-mounting.
+
+Bottom line: sharing a PVC across clusters removes the coordination layer that keeps your data safe. If you need the same data in multiple clusters, expose it through a storage system designed for multi-client access or replicate it—don’t co-own the same Kubernetes volume.
+
+
+
+
+
+
+
+
+Is this helpful so far?
+
+
+
+Ask ChatGPT
